@@ -80,8 +80,8 @@ impl Cpu {
         self.registers[REGISTER_ZERO as usize] = 0;
 
         let opcode = self.fetch();
-        let category = (opcode & 0xF0) >> 4;
-        let instruction = opcode & 0x0F;
+        let category = opcode & 0x0F;
+        let instruction = (opcode & 0xF0) >> 4;
         match category {
             INSTRUCTION_CATEGORY_INVALID => match instruction {
                 INSTRUCTION_INVALID => return ControlFlow::Break(CpuStepError::InvalidInstruction),
