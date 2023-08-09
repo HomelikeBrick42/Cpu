@@ -7,10 +7,35 @@ pub use memory::*;
 mod memory;
 
 const REGISTER_COUNT: usize = 13;
-const REGISTER_ZERO: u8 = 0b000;
-const REGISTER_INSTRUCTION_POINTER: u8 = 0b001;
-const REGISTER_RETURN_ADDRESS: u8 = 0b010;
-const REGISTER_STACK_POINTER: u8 = 0b011;
+pub const REGISTER_ZERO: u8 = 0b000;
+pub const REGISTER_INSTRUCTION_POINTER: u8 = 0b001;
+pub const REGISTER_RETURN_ADDRESS: u8 = 0b010;
+pub const REGISTER_STACK_POINTER: u8 = 0b011;
+
+pub const INSTRUCTION_CATEGORY_INVALID: u8 = 0x0;
+pub const INSTRUCTION_INVALID: u8 = 0x0;
+
+pub const INSTRUCTION_CATEGORY_ARITHMETIC: u8 = 0x1;
+pub const INSTRUCTION_ADD: u8 = 0x0;
+pub const INSTRUCTION_SUB: u8 = 0x1;
+pub const INSTRUCTION_MUL: u8 = 0x2;
+pub const INSTRUCTION_DIVMOD: u8 = 0x3;
+pub const INSTRUCTION_AND: u8 = 0x4;
+pub const INSTRUCTION_OR: u8 = 0x5;
+pub const INSTRUCTION_XOR: u8 = 0x6;
+pub const INSTRUCTION_NOT: u8 = 0x7;
+
+pub const INSTRUCTION_CATEGORY_MEMORY: u8 = 0x2;
+pub const INSTRUCTION_COPY: u8 = 0x0;
+pub const INSTRUCTION_LOAD: u8 = 0x1;
+pub const INSTRUCTION_READ: u8 = 0x2;
+pub const INSTRUCTION_WRITE: u8 = 0x3;
+pub const INSTRUCTION_PUSH: u8 = 0x4;
+pub const INSTRUCTION_POP: u8 = 0x5;
+
+pub const INSTRUCTION_CATEGORY_CONTROL_FLOW: u8 = 0x3;
+pub const INSTRUCTION_HALT: u8 = 0x0;
+pub const INSTRUCTION_CALL: u8 = 0x1;
 
 pub struct Cpu {
     memory: Memory,
@@ -58,16 +83,13 @@ impl Cpu {
         let category = (opcode & 0xF0) >> 4;
         let instruction = opcode & 0x0F;
         match category {
-            // Invalid
-            0x0 => match instruction {
-                0x0 => return ControlFlow::Break(CpuStepError::InvalidInstruction),
+            INSTRUCTION_CATEGORY_INVALID => match instruction {
+                INSTRUCTION_INVALID => return ControlFlow::Break(CpuStepError::InvalidInstruction),
                 _ => return ControlFlow::Break(CpuStepError::InvalidInvalidInstruction),
             },
 
-            // Arithmetic
-            0x1 => match instruction {
-                // Add
-                0x0 => {
+            INSTRUCTION_CATEGORY_ARITHMETIC => match instruction {
+                INSTRUCTION_ADD => {
                     let inputs = self.fetch();
                     let a = inputs & 0x0F;
                     let b = (inputs & 0xF0) >> 4;
@@ -76,8 +98,7 @@ impl Cpu {
                     self.registers[o as usize] =
                         self.registers[a as usize].wrapping_add(self.registers[b as usize]);
                 }
-                // Sub
-                0x1 => {
+                INSTRUCTION_SUB => {
                     let inputs = self.fetch();
                     let a = inputs & 0x0F;
                     let b = (inputs & 0xF0) >> 4;
@@ -86,8 +107,7 @@ impl Cpu {
                     self.registers[o as usize] =
                         self.registers[a as usize].wrapping_sub(self.registers[b as usize]);
                 }
-                // Mul
-                0x2 => {
+                INSTRUCTION_MUL => {
                     let inputs = self.fetch();
                     let a = inputs & 0x0F;
                     let b = (inputs & 0xF0) >> 4;
@@ -96,8 +116,7 @@ impl Cpu {
                     self.registers[o as usize] =
                         self.registers[a as usize].wrapping_mul(self.registers[b as usize]);
                 }
-                // DivMod
-                0x3 => {
+                INSTRUCTION_DIVMOD => {
                     let inputs = self.fetch();
                     let a = inputs & 0x0F;
                     let b = (inputs & 0xF0) >> 4;
@@ -111,8 +130,7 @@ impl Cpu {
                         .checked_rem(self.registers[b as usize])
                         .unwrap_or(0);
                 }
-                // And
-                0x4 => {
+                INSTRUCTION_AND => {
                     let inputs = self.fetch();
                     let a = inputs & 0x0F;
                     let b = (inputs & 0xF0) >> 4;
@@ -121,8 +139,7 @@ impl Cpu {
                     self.registers[o as usize] =
                         self.registers[a as usize] & self.registers[b as usize];
                 }
-                // Or
-                0x5 => {
+                INSTRUCTION_OR => {
                     let inputs = self.fetch();
                     let a = inputs & 0x0F;
                     let b = (inputs & 0xF0) >> 4;
@@ -131,8 +148,7 @@ impl Cpu {
                     self.registers[o as usize] =
                         self.registers[a as usize] | self.registers[b as usize];
                 }
-                // Xor
-                0x6 => {
+                INSTRUCTION_XOR => {
                     let inputs = self.fetch();
                     let a = inputs & 0x0F;
                     let b = (inputs & 0xF0) >> 4;
@@ -141,8 +157,7 @@ impl Cpu {
                     self.registers[o as usize] =
                         self.registers[a as usize] ^ self.registers[b as usize];
                 }
-                // Not
-                0x7 => {
+                INSTRUCTION_NOT => {
                     let operands = self.fetch();
                     let a = operands & 0x0F;
                     let o = (operands & 0xF0) >> 4;
@@ -151,39 +166,33 @@ impl Cpu {
                 _ => return ControlFlow::Break(CpuStepError::InvalidArithmeticInstruction),
             },
 
-            // Memory
-            0x2 => match instruction {
-                // Copy
-                0x0 => {
+            INSTRUCTION_CATEGORY_MEMORY => match instruction {
+                INSTRUCTION_COPY => {
                     let operands = self.fetch();
                     let a = operands & 0x0F;
                     let b = (operands & 0xF0) >> 4;
                     self.registers[b as usize] = self.registers[a as usize];
                 }
-                // Load
-                0x1 => {
+                INSTRUCTION_LOAD => {
                     let operand = self.fetch();
                     let a = operand & 0x0F;
                     let imm = self.fetch_u64();
                     self.registers[a as usize] = imm;
                 }
-                // Read
-                0x2 => {
+                INSTRUCTION_READ => {
                     let operands = self.fetch();
                     let a = operands & 0x0F;
                     let b = (operands & 0xF0) >> 4;
                     self.registers[b as usize] = self.memory.read_u64(self.registers[a as usize]);
                 }
-                // Write
-                0x3 => {
+                INSTRUCTION_WRITE => {
                     let operands = self.fetch();
                     let a = operands & 0x0F;
                     let b = (operands & 0xF0) >> 4;
                     self.memory
                         .write_u64(self.registers[b as usize], self.registers[a as usize]);
                 }
-                // Push
-                0x4 => {
+                INSTRUCTION_PUSH => {
                     let operands = self.fetch();
                     let a = operands & 0x0F;
                     self.registers[REGISTER_STACK_POINTER as usize] -= 8;
@@ -192,8 +201,7 @@ impl Cpu {
                         self.registers[a as usize],
                     );
                 }
-                // Pop
-                0x5 => {
+                INSTRUCTION_POP => {
                     let operands = self.fetch();
                     let a = operands & 0x0F;
                     self.registers[a as usize] = self
@@ -204,12 +212,9 @@ impl Cpu {
                 _ => return ControlFlow::Break(CpuStepError::InvalidMemoryInstruction),
             },
 
-            // Control Flow
-            0x3 => match instruction {
-                // Halt
-                0x0 => return ControlFlow::Break(CpuStepError::Halt),
-                // Call
-                0x1 => {
+            INSTRUCTION_CATEGORY_CONTROL_FLOW => match instruction {
+                INSTRUCTION_HALT => return ControlFlow::Break(CpuStepError::Halt),
+                INSTRUCTION_CALL => {
                     let operands = self.fetch();
                     let a = operands & 0x0F;
                     self.registers[REGISTER_RETURN_ADDRESS as usize] =
